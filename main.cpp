@@ -34,10 +34,9 @@ namespace
     {
         std::string scopedName;
 
-        for (const auto& name: scope)
+        for (const auto& n: scope)
         {
-            scopedName += name;
-
+            scopedName += n;
             scopedName += "::";
         }
 
@@ -144,7 +143,7 @@ int main(int argc, char* argv[])
         const auto& name = c.name;
 
         std::cout << "template<typename T>"                                     << "\n";
-        std::cout << "void for_each_member_of(" << name << "& obj, T action)"   << "\n";
+        std::cout << "void for_each_member_of(const " << name << "& obj, T action)"   << "\n";
         std::cout << "{"                                                        << "\n";
 
         for (const auto& member: c.members)
