@@ -125,6 +125,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "\n";
+    std::cout << "#pragma once\n";
     std::cout << "#include " << cppAbsoluteFilePath << "\n\n";
 
     std::cout << "template<typename T>"         << "\n";
