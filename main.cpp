@@ -57,8 +57,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::cout << "template<typename T>"    << "\n";
-    std::cout << "for_each_member_of();"   << "\n";
+    std::cout << "template<typename T>"         << "\n";
+    std::cout << "void for_each_member_of();"   << "\n\n";
 
     CXCursor cursor = clang_getTranslationUnitCursor(translationUnit);
     clang_visitChildren(cursor, visitor, nullptr);
