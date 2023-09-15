@@ -128,8 +128,8 @@ int main(int argc, char* argv[])
     std::cout << "#pragma once\n";
     std::cout << "#include " << cppAbsoluteFilePath << "\n\n";
 
-    std::cout << "template<typename T>"         << "\n";
-    std::cout << "void for_each_member_of();"   << "\n\n";
+    std::cout << "template<typename T, typename R>"         << "\n";
+    std::cout << "void for_each_member_of(const T&, R);"    << "\n\n";
 
     ParseData data;
 
