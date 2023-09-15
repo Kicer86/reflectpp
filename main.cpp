@@ -148,9 +148,9 @@ int main(int argc, char* argv[])
     }
 
     CXIndex index = clang_createIndex(0, 0);
-    const char* cppFilePath = argv[1];
+    const char* source_file = argv[1];
 
-    const auto cppAbsoluteFilePath = std::filesystem::absolute(cppFilePath);
+    const auto source_file_absolute_path = std::filesystem::absolute(source_file);
 
     std::vector<const char *> args;
 
@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
     }
 
     CXTranslationUnit translationUnit = clang_parseTranslationUnit(
-        index, cppAbsoluteFilePath.c_str(), args.data(), static_cast<int>(args.size()), nullptr, 0, CXTranslationUnit_None);
+        index, source_file_absolute_path.c_str(), args.data(), static_cast<int>(args.size()), nullptr, 0, CXTranslationUnit_None);
 
     if (!translationUnit)
     {
@@ -188,14 +188,14 @@ int main(int argc, char* argv[])
 
     std::cout << "\n";
     std::cout << "#pragma once\n";
-    std::cout << "#include " << cppAbsoluteFilePath << "\n\n";
+    std::cout << "#include " << source_file_absolute_path << "\n\n";
 
-    std::cout << "// Parsing file: " << cppAbsoluteFilePath << "\n\n";
+    std::cout << "// Parsing file: " << source_file_absolute_path << "\n\n";
 
     std::cout << "template<typename T, typename R>"         << "\n";
     std::cout << "void for_each_member_of(const T&, R);"    << "\n\n";
 
-    ParseData data(cppAbsoluteFilePath);
+    ParseData data(source_file_absolute_path);
 
     CXCursor cursor = clang_getTranslationUnitCursor(translationUnit);
     clang_visitChildren(cursor, visitor, &data);
