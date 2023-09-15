@@ -5,6 +5,7 @@
 #include <deque>
 #include <filesystem>
 #include <iostream>
+#include <set>
 #include <vector>
 #include <clang-c/Index.h>
 
@@ -13,7 +14,11 @@ namespace
 {
     struct ParseData
     {
+        ParseData(const std::string& path): source_path(path) {}
+
+        std::string source_path;
         std::deque<std::string> scope;
+        std::set<std::string> ignored_files;
 
         struct Member
         {
@@ -33,7 +38,7 @@ namespace
         Class* currentClass;
     };
 
-    std::string generateScopedName(const std::deque<std::string>& scope, const std::string& name)
+    std::string generateScopedName(const std::deque<std::string>& scope, const std::string_view& name)
     {
         std::string scopedName;
 
@@ -54,24 +59,45 @@ CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data)
 {
     ParseData* data = static_cast<ParseData *>(client_data);
 
+    // Get the cursor's source location
+    CXSourceLocation location = clang_getCursorLocation(cursor);
+
+    // Get the file associated with the source location
+    CXFile file;
+    clang_getFileLocation(location, &file, nullptr, nullptr, nullptr);
+
+    // Get the file's name
+    CXString fileName = clang_getFileName(file);
+    const std::string fileNameStr = clang_getCString(fileName);
+    clang_disposeString(fileName);
+
+    if (fileNameStr != data->source_path)
+    {
+        data->ignored_files.insert(fileNameStr);
+        return CXChildVisit_Continue;
+    }
+
     const auto cursorKind = clang_getCursorKind(cursor);
 
     if (cursorKind == CXCursor_FieldDecl)
     {
         const CXString cxname = clang_getCursorSpelling(cursor);
         const CXType cxtype = clang_getCursorType(cursor);
-        const auto name = clang_getCString(cxname);
-        const auto type = clang_getCString(clang_getTypeSpelling(cxtype));
+        const std::string_view name = clang_getCString(cxname);
 
-        data->currentClass->members.push_back({.name = name, .type = type});
+        if (name.empty() == false)
+        {
+            const auto type = clang_getCString(clang_getTypeSpelling(cxtype));
+
+            data->currentClass->members.push_back({.name = std::string(name), .type = type});
+        }
 
         clang_disposeString(cxname);
     }
     else if (cursorKind == CXCursor_ClassDecl || cursorKind == CXCursor_StructDecl)
     {
         const CXString cxname = clang_getCursorSpelling(cursor);
-        const std::string name = clang_getCString(cxname);
-        clang_disposeString(cxname);
+        const std::string_view name = clang_getCString(cxname);
 
         if (name.starts_with('_') == false)
         {
@@ -79,7 +105,7 @@ CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data)
 
             ParseData::Class* currentClass = data->currentClass;
             data->currentClass = &data->classesList.back();             // define where CXCursor_FieldDecl should add themselves
-            data->scope.push_back(name);
+            data->scope.push_back(std::string(name));
 
             clang_visitChildren(cursor, visitor, data);
 
@@ -87,23 +113,26 @@ CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data)
             data->scope.pop_back();
             data->currentClass = currentClass;
         }
+
+        clang_disposeString(cxname);
     }
     else if (cursorKind == CXCursor_Namespace)
     {
         const CXString cxname = clang_getCursorSpelling(cursor);
-        const std::string name = clang_getCString(cxname);
-        clang_disposeString(cxname);
+        const std::string_view name = clang_getCString(cxname);
 
         if (name != "std" && name.starts_with('_') == false)
         {
             if (name.empty() == false)
-                data->scope.push_back(name);
+                data->scope.push_back(std::string(name));
 
             clang_visitChildren(cursor, visitor, data);
 
             if (name.empty() == false)
                 data->scope.pop_back();
         }
+
+        clang_disposeString(cxname);
     }
 
     return CXChildVisit_Continue;
@@ -149,7 +178,7 @@ int main(int argc, char* argv[])
     }
 
     CXTranslationUnit translationUnit = clang_parseTranslationUnit(
-        index, cppFilePath, args.data(), static_cast<int>(args.size()), nullptr, 0, CXTranslationUnit_None);
+        index, cppAbsoluteFilePath.c_str(), args.data(), static_cast<int>(args.size()), nullptr, 0, CXTranslationUnit_None);
 
     if (!translationUnit)
     {
@@ -161,16 +190,24 @@ int main(int argc, char* argv[])
     std::cout << "#pragma once\n";
     std::cout << "#include " << cppAbsoluteFilePath << "\n\n";
 
+    std::cout << "// Parsing file: " << cppAbsoluteFilePath << "\n\n";
+
     std::cout << "template<typename T, typename R>"         << "\n";
     std::cout << "void for_each_member_of(const T&, R);"    << "\n\n";
 
-    ParseData data;
+    ParseData data(cppAbsoluteFilePath);
 
     CXCursor cursor = clang_getTranslationUnitCursor(translationUnit);
     clang_visitChildren(cursor, visitor, &data);
 
     clang_disposeTranslationUnit(translationUnit);
     clang_disposeIndex(index);
+
+    std::cout << "// Ignored content of files: \n";
+    for (const auto& name: data.ignored_files)
+        std::cout << "// " << name << "\n";
+
+    std::cout << "\n";
 
     for (const auto& c: data.classesList)
     {
