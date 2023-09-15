@@ -1,4 +1,7 @@
 
+#include <algorithm>
+#include <cassert>
+#include <cstring>
 #include <deque>
 #include <filesystem>
 #include <iostream>
@@ -67,35 +70,40 @@ CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data)
     else if (cursorKind == CXCursor_ClassDecl || cursorKind == CXCursor_StructDecl)
     {
         const CXString cxname = clang_getCursorSpelling(cursor);
-        const auto name = clang_getCString(cxname);
-
-        data->classesList.push_back(ParseData::Class(generateScopedName(data->scope, name)));
-
-        ParseData::Class* currentClass = data->currentClass;
-        data->currentClass = &data->classesList.back();             // define where CXCursor_FieldDecl should add themselves
-        data->scope.push_back(name);
-
+        const std::string name = clang_getCString(cxname);
         clang_disposeString(cxname);
-        clang_visitChildren(cursor, visitor, data);
 
-        // restore previous pointer to current class so CXCursor_FieldDecl from this level of recursion will write to theirs owner
-        data->scope.pop_back();
-        data->currentClass = currentClass;
+        if (name.starts_with('_') == false)
+        {
+            data->classesList.push_back(ParseData::Class(generateScopedName(data->scope, name)));
+
+            ParseData::Class* currentClass = data->currentClass;
+            data->currentClass = &data->classesList.back();             // define where CXCursor_FieldDecl should add themselves
+            data->scope.push_back(name);
+
+            clang_visitChildren(cursor, visitor, data);
+
+            // restore previous pointer to current class so CXCursor_FieldDecl from this level of recursion will write to theirs owner
+            data->scope.pop_back();
+            data->currentClass = currentClass;
+        }
     }
     else if (cursorKind == CXCursor_Namespace)
     {
         const CXString cxname = clang_getCursorSpelling(cursor);
         const std::string name = clang_getCString(cxname);
-
-        if (name.empty() == false)
-            data->scope.push_back(name);
-
         clang_disposeString(cxname);
 
-        clang_visitChildren(cursor, visitor, data);
+        if (name != "std" && name.starts_with('_') == false)
+        {
+            if (name.empty() == false)
+                data->scope.push_back(name);
 
-        if (name.empty() == false)
-            data->scope.pop_back();
+            clang_visitChildren(cursor, visitor, data);
+
+            if (name.empty() == false)
+                data->scope.pop_back();
+        }
     }
 
     return CXChildVisit_Continue;
@@ -104,9 +112,9 @@ CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data)
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2)
+    if (argc != 2 && argc != 3)
     {
-        std::cerr << "Usage: " << argv[0] << " <cpp_file.cpp>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <file to parse> [<clang options to be included, separated with :>]" << std::endl;
         return 1;
     }
 
@@ -115,8 +123,33 @@ int main(int argc, char* argv[])
 
     const auto cppAbsoluteFilePath = std::filesystem::absolute(cppFilePath);
 
+    std::vector<const char *> args;
+
+    if (argc == 3)
+    {
+        char* lookup = argv[2];
+        long lookup_len = static_cast<long>(std::strlen(lookup));
+
+        for(;;)
+        {
+            args.push_back(lookup);
+            char* pos = std::find(lookup, lookup + lookup_len, ':');
+
+            if (pos < lookup + lookup_len)
+            {
+                const auto entry_len = pos - lookup + 1;
+                *pos = '\0';
+                lookup = pos + 1;
+                lookup_len -= entry_len;
+                assert(lookup_len >= 0);
+            }
+            else
+                break;
+        }
+    }
+
     CXTranslationUnit translationUnit = clang_parseTranslationUnit(
-        index, cppFilePath, nullptr, 0, nullptr, 0, CXTranslationUnit_None);
+        index, cppFilePath, args.data(), static_cast<int>(args.size()), nullptr, 0, CXTranslationUnit_None);
 
     if (!translationUnit)
     {
