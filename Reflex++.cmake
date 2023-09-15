@@ -1,7 +1,7 @@
 
-function(ReflexFiles output source_files)
+function(ReflexFiles output)
 
-    foreach(source_file ${source_files})
+    foreach(source_file ${ARGN})
         get_filename_component(source_name ${source_file} NAME_WE)
         set(output_name ${source_name}_r++.hpp)
 
