@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
             const auto& member_name = member.name;
             const auto& member_type = member.type;
 
-            std::cout << "\taction(\"" << name << "\", obj." << member_name << ");\t// " << member_type << "\n";
+            std::cout << "\taction(\"" << member_name << "\", obj." << member_name << ");\t// " << member_type << "\n";
         }
 
         std::cout << "}"                                                        << "\n\n";
