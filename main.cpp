@@ -52,90 +52,89 @@ namespace
 
         return scopedName;
     }
-}
 
-
-CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data)
-{
-    ParseData* data = static_cast<ParseData *>(client_data);
-
-    // Get the cursor's source location
-    CXSourceLocation location = clang_getCursorLocation(cursor);
-
-    // Get the file associated with the source location
-    CXFile file;
-    clang_getFileLocation(location, &file, nullptr, nullptr, nullptr);
-
-    // Get the file's name
-    CXString fileName = clang_getFileName(file);
-    const std::string fileNameStr = clang_getCString(fileName);
-    clang_disposeString(fileName);
-
-    if (fileNameStr != data->source_path)
+    CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data)
     {
-        data->ignored_files.insert(fileNameStr);
-        return CXChildVisit_Continue;
-    }
+        ParseData* data = static_cast<ParseData *>(client_data);
 
-    const auto cursorKind = clang_getCursorKind(cursor);
+        // Get the cursor's source location
+        CXSourceLocation location = clang_getCursorLocation(cursor);
 
-    if (cursorKind == CXCursor_FieldDecl)
-    {
-        const CXString cxname = clang_getCursorSpelling(cursor);
-        const CXType cxtype = clang_getCursorType(cursor);
-        const std::string_view name = clang_getCString(cxname);
+        // Get the file associated with the source location
+        CXFile file;
+        clang_getFileLocation(location, &file, nullptr, nullptr, nullptr);
 
-        if (name.empty() == false)
+        // Get the file's name
+        CXString fileName = clang_getFileName(file);
+        const std::string fileNameStr = clang_getCString(fileName);
+        clang_disposeString(fileName);
+
+        if (fileNameStr != data->source_path)
         {
-            const auto type = clang_getCString(clang_getTypeSpelling(cxtype));
-
-            data->currentClass->members.push_back({.name = std::string(name), .type = type});
+            data->ignored_files.insert(fileNameStr);
+            return CXChildVisit_Continue;
         }
 
-        clang_disposeString(cxname);
-    }
-    else if (cursorKind == CXCursor_ClassDecl || cursorKind == CXCursor_StructDecl)
-    {
-        const CXString cxname = clang_getCursorSpelling(cursor);
-        const std::string_view name = clang_getCString(cxname);
+        const auto cursorKind = clang_getCursorKind(cursor);
 
-        if (name.starts_with('_') == false)
+        if (cursorKind == CXCursor_FieldDecl)
         {
-            data->classesList.push_back(ParseData::Class(generateScopedName(data->scope, name)));
+            const CXString cxname = clang_getCursorSpelling(cursor);
+            const CXType cxtype = clang_getCursorType(cursor);
+            const std::string_view name = clang_getCString(cxname);
 
-            ParseData::Class* currentClass = data->currentClass;
-            data->currentClass = &data->classesList.back();             // define where CXCursor_FieldDecl should add themselves
-            data->scope.push_back(std::string(name));
-
-            clang_visitChildren(cursor, visitor, data);
-
-            // restore previous pointer to current class so CXCursor_FieldDecl from this level of recursion will write to theirs owner
-            data->scope.pop_back();
-            data->currentClass = currentClass;
-        }
-
-        clang_disposeString(cxname);
-    }
-    else if (cursorKind == CXCursor_Namespace)
-    {
-        const CXString cxname = clang_getCursorSpelling(cursor);
-        const std::string_view name = clang_getCString(cxname);
-
-        if (name != "std" && name.starts_with('_') == false)
-        {
             if (name.empty() == false)
+            {
+                const auto type = clang_getCString(clang_getTypeSpelling(cxtype));
+
+                data->currentClass->members.push_back({.name = std::string(name), .type = type});
+            }
+
+            clang_disposeString(cxname);
+        }
+        else if (cursorKind == CXCursor_ClassDecl || cursorKind == CXCursor_StructDecl)
+        {
+            const CXString cxname = clang_getCursorSpelling(cursor);
+            const std::string_view name = clang_getCString(cxname);
+
+            if (name.starts_with('_') == false)
+            {
+                data->classesList.push_back(ParseData::Class(generateScopedName(data->scope, name)));
+
+                ParseData::Class* currentClass = data->currentClass;
+                data->currentClass = &data->classesList.back();             // define where CXCursor_FieldDecl should add themselves
                 data->scope.push_back(std::string(name));
 
-            clang_visitChildren(cursor, visitor, data);
+                clang_visitChildren(cursor, visitor, data);
 
-            if (name.empty() == false)
+                // restore previous pointer to current class so CXCursor_FieldDecl from this level of recursion will write to theirs owner
                 data->scope.pop_back();
+                data->currentClass = currentClass;
+            }
+
+            clang_disposeString(cxname);
+        }
+        else if (cursorKind == CXCursor_Namespace)
+        {
+            const CXString cxname = clang_getCursorSpelling(cursor);
+            const std::string_view name = clang_getCString(cxname);
+
+            if (name != "std" && name.starts_with('_') == false)
+            {
+                if (name.empty() == false)
+                    data->scope.push_back(std::string(name));
+
+                clang_visitChildren(cursor, visitor, data);
+
+                if (name.empty() == false)
+                    data->scope.pop_back();
+            }
+
+            clang_disposeString(cxname);
         }
 
-        clang_disposeString(cxname);
+        return CXChildVisit_Continue;
     }
-
-    return CXChildVisit_Continue;
 }
 
 
