@@ -151,27 +151,11 @@ namespace
 
         return CXChildVisit_Continue;
     }
-}
 
-
-int main(int argc, char* argv[])
-{
-    if (argc != 2 && argc != 3)
+    std::vector<const char *> createClangArgs(char* lookup)
     {
-        std::cerr << "Usage: " << argv[0] << " <file to parse> [<clang options to be included, separated with :>]" << std::endl;
-        return 1;
-    }
+        std::vector<const char *> args;
 
-    CXIndex index = clang_createIndex(0, 0);
-    const char* source_file = argv[1];
-
-    const auto source_file_absolute_path = std::filesystem::absolute(source_file);
-
-    std::vector<const char *> args;
-
-    if (argc == 3)
-    {
-        char* lookup = argv[2];
         long lookup_len = static_cast<long>(std::strlen(lookup));
 
         for(;;)
@@ -190,7 +174,25 @@ int main(int argc, char* argv[])
             else
                 break;
         }
+
+        return args;
     }
+
+}
+
+
+int main(int argc, char* argv[])
+{
+    if (argc != 2 && argc != 3)
+    {
+        std::cerr << "Usage: " << argv[0] << " <file to parse> [<clang options to be included, separated with :>]" << std::endl;
+        return 1;
+    }
+
+    const std::vector<const char *> args = argc == 3? createClangArgs(argv[2]): std::vector<const char *>();
+    const char* source_file = argv[1];
+    CXIndex index = clang_createIndex(0, 0);
+    const auto source_file_absolute_path = std::filesystem::absolute(source_file);
 
     CXTranslationUnit translationUnit = clang_parseTranslationUnit(
         index, source_file_absolute_path.c_str(), args.data(), static_cast<int>(args.size()), nullptr, 0, CXTranslationUnit_None);
