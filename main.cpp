@@ -83,16 +83,13 @@ namespace
         const CXString cxname = clang_getCursorSpelling(cursor);
         const std::string_view name = clang_getCString(cxname);
 
-        if (name.starts_with('_') == false)
-        {
-            data.classesList.push_back(ParseData::Class(generateScopedName(data.scope, name)));
-            data.scope.push_back(std::string(name));
+        data.classesList.push_back(ParseData::Class(generateScopedName(data.scope, name)));
+        data.scope.push_back(std::string(name));
 
-            clang_visitChildren(cursor, membersVisitor, &data.classesList.back().members);
-            clang_visitChildren(cursor, visitor, &data);
+        clang_visitChildren(cursor, membersVisitor, &data.classesList.back().members);
+        clang_visitChildren(cursor, visitor, &data);
 
-            data.scope.pop_back();
-        }
+        data.scope.pop_back();
 
         clang_disposeString(cxname);
     }
@@ -102,16 +99,13 @@ namespace
         const CXString cxname = clang_getCursorSpelling(cursor);
         const std::string_view name = clang_getCString(cxname);
 
-        if (name != "std" && name.starts_with('_') == false)
-        {
-            if (name.empty() == false)
-                data.scope.push_back(std::string(name));
+        if (name.empty() == false)
+            data.scope.push_back(std::string(name));
 
-            clang_visitChildren(cursor, visitor, &data);
+        clang_visitChildren(cursor, visitor, &data);
 
-            if (name.empty() == false)
-                data.scope.pop_back();
-        }
+        if (name.empty() == false)
+            data.scope.pop_back();
 
         clang_disposeString(cxname);
     }
