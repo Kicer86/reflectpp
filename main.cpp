@@ -53,6 +53,32 @@ namespace
         return scopedName;
     }
 
+    CXChildVisitResult membersVisitor(CXCursor cursor, CXCursor, CXClientData client_data)
+    {
+        const auto cursorKind = clang_getCursorKind(cursor);
+
+        if (cursorKind == CXCursor_FieldDecl)
+        {
+            std::vector<ParseData::Member>* members = static_cast<std::vector<ParseData::Member>*>(client_data);
+
+            const CXString cxname = clang_getCursorSpelling(cursor);
+            const CXType cxtype = clang_getCursorType(cursor);
+            const std::string_view name = clang_getCString(cxname);
+
+            if (name.empty() == false)
+            {
+                const auto type = clang_getCString(clang_getTypeSpelling(cxtype));
+
+                members->push_back({.name = std::string(name), .type = type});
+            }
+
+            clang_disposeString(cxname);
+        }
+
+        return CXChildVisit_Continue;
+    }
+
+
     CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data)
     {
         ParseData* data = static_cast<ParseData *>(client_data);
@@ -77,22 +103,7 @@ namespace
 
         const auto cursorKind = clang_getCursorKind(cursor);
 
-        if (cursorKind == CXCursor_FieldDecl)
-        {
-            const CXString cxname = clang_getCursorSpelling(cursor);
-            const CXType cxtype = clang_getCursorType(cursor);
-            const std::string_view name = clang_getCString(cxname);
-
-            if (name.empty() == false)
-            {
-                const auto type = clang_getCString(clang_getTypeSpelling(cxtype));
-
-                data->currentClass->members.push_back({.name = std::string(name), .type = type});
-            }
-
-            clang_disposeString(cxname);
-        }
-        else if (cursorKind == CXCursor_ClassDecl || cursorKind == CXCursor_StructDecl)
+        if (cursorKind == CXCursor_ClassDecl || cursorKind == CXCursor_StructDecl)
         {
             const CXString cxname = clang_getCursorSpelling(cursor);
             const std::string_view name = clang_getCString(cxname);
@@ -105,6 +116,7 @@ namespace
                 data->currentClass = &data->classesList.back();             // define where CXCursor_FieldDecl should add themselves
                 data->scope.push_back(std::string(name));
 
+                clang_visitChildren(cursor, membersVisitor, &data->currentClass->members);
                 clang_visitChildren(cursor, visitor, data);
 
                 // restore previous pointer to current class so CXCursor_FieldDecl from this level of recursion will write to theirs owner
