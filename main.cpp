@@ -142,7 +142,12 @@ namespace
             const auto cursorKind = clang_getCursorKind(cursor);
 
             if (cursorKind == CXCursor_ClassDecl || cursorKind == CXCursor_StructDecl)
-                processClass(cursor, *data);
+            {
+                CXCursorKind definitionKind = clang_getCursorDefinition(cursor).kind;
+
+                if (definitionKind == CXCursor_ClassDecl || definitionKind == CXCursor_StructDecl)
+                    processClass(cursor, *data);
+            }
             else if (cursorKind == CXCursor_Namespace)
                 processNamespace(cursor, *data);
         }
