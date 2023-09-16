@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
-#include <deque>
 #include <filesystem>
 #include <iostream>
 #include <set>
@@ -17,7 +16,7 @@ namespace
         ParseData(const std::string& path): source_path(path) {}
 
         std::string source_path;
-        std::deque<std::string> scope;
+        std::vector<std::string> scope;
         std::set<std::string> ignored_files;
 
         struct Member
@@ -34,11 +33,10 @@ namespace
             std::vector<Member> members;
         };
 
-        std::deque<Class> classesList;
-        Class* currentClass;
+        std::vector<Class> classesList;
     };
 
-    std::string generateScopedName(const std::deque<std::string>& scope, const std::string_view& name)
+    std::string generateScopedName(const std::vector<std::string>& scope, const std::string_view& name)
     {
         std::string scopedName;
 
@@ -88,17 +86,12 @@ namespace
         if (name.starts_with('_') == false)
         {
             data.classesList.push_back(ParseData::Class(generateScopedName(data.scope, name)));
-
-            ParseData::Class* currentClass = data.currentClass;
-            data.currentClass = &data.classesList.back();             // define where CXCursor_FieldDecl should add themselves
             data.scope.push_back(std::string(name));
 
-            clang_visitChildren(cursor, membersVisitor, &data.currentClass->members);
+            clang_visitChildren(cursor, membersVisitor, &data.classesList.back().members);
             clang_visitChildren(cursor, visitor, &data);
 
-            // restore previous pointer to current class so CXCursor_FieldDecl from this level of recursion will write to theirs owner
             data.scope.pop_back();
-            data.currentClass = currentClass;
         }
 
         clang_disposeString(cxname);
