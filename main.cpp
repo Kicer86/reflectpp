@@ -17,7 +17,6 @@ namespace
 
         std::string source_path;
         std::vector<std::string> scope;
-        std::set<std::string> ignored_files;
 
         struct Member
         {
@@ -138,8 +137,6 @@ namespace
             else if (cursorKind == CXCursor_Namespace)
                 processNamespace(cursor, *data);
         }
-        else
-            data->ignored_files.insert(fileNameStr);
 
         return CXChildVisit_Continue;
     }
@@ -211,12 +208,6 @@ int main(int argc, char* argv[])
 
     clang_disposeTranslationUnit(translationUnit);
     clang_disposeIndex(index);
-
-    std::cout << "// Ignored content of files: \n";
-    for (const auto& name: data.ignored_files)
-        std::cout << "// " << name << "\n";
-
-    std::cout << "\n";
 
     for (const auto& c: data.classesList)
     {
