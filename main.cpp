@@ -194,9 +194,9 @@ int main(int argc, char* argv[])
     {
         const auto& name = c.name;
 
-        output << "template<typename T>"                                     << "\n";
-        output << "void for_each_member_of(const " << name << "& obj, T action)"   << "\n";
-        output << "{"                                                        << "\n";
+        output << "template<typename T>"                                            << "\n";
+        output << "void for_each_member_of(const " << name << "& obj, T action)"    << "\n";
+        output << "{"                                                               << "\n";
 
         for (const auto& member: c.members)
         {
@@ -206,7 +206,7 @@ int main(int argc, char* argv[])
             output << "\taction(\"" << member_name << "\", obj." << member_name << ");\t// " << member_type << "\n";
         }
 
-        output << "}"                                                        << "\n\n";
+        output << "}"                                                               << "\n\n";
     }
 
     return 0;
