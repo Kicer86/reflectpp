@@ -130,8 +130,7 @@ namespace
 
             if (cursorKind == CXCursor_ClassDecl || cursorKind == CXCursor_StructDecl)
             {
-                CXCursorKind definitionKind = clang_getCursorDefinition(cursor).kind;
-
+                const CXCursorKind definitionKind = clang_getCursorDefinition(cursor).kind;
                 const CXType cursorType = clang_getCursorType(cursor);
                 const int templateArgs = clang_Type_getNumTemplateArguments(cursorType);
 
