@@ -51,6 +51,23 @@ namespace
         return scopedName;
     }
 
+    std::string generateMessage(CXCursor cursor, std::string_view message)
+    {
+        const CXSourceLocation location = clang_getCursorLocation(cursor);
+
+        CXFile file;
+        unsigned line, column;
+        clang_getFileLocation(location, &file, &line, &column, nullptr);
+
+        const char* filePath = clang_getCString(clang_getFileName(file));
+
+        std::string fullMessage = filePath;
+        fullMessage += ":" + std::to_string(line) + ":" + std::to_string(column) + ": ";
+        fullMessage += message;
+
+        return fullMessage;
+    }
+
     CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data);
 
     CXChildVisitResult membersVisitor(CXCursor cursor, CXCursor, CXClientData client_data)
@@ -66,6 +83,11 @@ namespace
             const std::string_view name = clang_getCString(cxname);
 
             const CX_CXXAccessSpecifier accessSpecifier = clang_getCXXAccessSpecifier(cursor);
+
+            if (accessSpecifier != CX_CXXPublic)
+            {
+                std::cerr << generateMessage(cursor, "warning: " + std::string(name) + " is not a public member. Unable to generate reflexion data for it." + "\n");
+            }
 
             if (name.empty() == false && accessSpecifier == CX_CXXPublic)
             {
