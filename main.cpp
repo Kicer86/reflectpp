@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <set>
 #include <vector>
@@ -140,51 +141,23 @@ namespace
 
         return CXChildVisit_Continue;
     }
-
-    std::vector<const char *> createClangArgs(char* lookup)
-    {
-        std::vector<const char *> args;
-
-        long lookup_len = static_cast<long>(std::strlen(lookup));
-
-        for(;;)
-        {
-            args.push_back(lookup);
-            char* pos = std::find(lookup, lookup + lookup_len, ':');
-
-            if (pos < lookup + lookup_len)
-            {
-                const auto entry_len = pos - lookup + 1;
-                *pos = '\0';
-                lookup = pos + 1;
-                lookup_len -= entry_len;
-                assert(lookup_len >= 0);
-            }
-            else
-                break;
-        }
-
-        return args;
-    }
-
 }
 
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2 && argc != 3)
+    if (argc < 3)
     {
-        std::cerr << "Usage: " << argv[0] << " <file to parse> [<clang options to be included, separated with :>]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <output file> <input file> [<clang options>]" << std::endl;
         return 1;
     }
 
-    const std::vector<const char *> args = argc == 3? createClangArgs(argv[2]): std::vector<const char *>();
-    const char* source_file = argv[1];
+    const char* source_file = argv[2];
     CXIndex index = clang_createIndex(0, 0);
     const auto source_file_absolute_path = std::filesystem::absolute(source_file);
 
     CXTranslationUnit translationUnit = clang_parseTranslationUnit(
-        index, source_file_absolute_path.c_str(), args.data(), static_cast<int>(args.size()), nullptr, 0, CXTranslationUnit_None);
+        index, source_file_absolute_path.c_str(), &argv[3], argc - 3, nullptr, 0, CXTranslationUnit_None);
 
     if (!translationUnit)
     {
@@ -192,14 +165,15 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::cout << "\n";
-    std::cout << "#pragma once\n";
-    std::cout << "#include " << source_file_absolute_path << "\n\n";
+    const char* output_file = argv[1];
+    std::ofstream output(output_file, std::ofstream::out | std::ofstream::trunc);
 
-    std::cout << "// Parsing file: " << source_file_absolute_path << "\n\n";
+    output << "\n";
+    output << "#pragma once\n";
+    output << "#include " << source_file_absolute_path << "\n\n";
 
-    std::cout << "template<typename T, typename R>"         << "\n";
-    std::cout << "void for_each_member_of(const T&, R);"    << "\n\n";
+    output << "template<typename T, typename R>"         << "\n";
+    output << "void for_each_member_of(const T&, R);"    << "\n\n";
 
     ParseData data(source_file_absolute_path);
 
@@ -213,19 +187,19 @@ int main(int argc, char* argv[])
     {
         const auto& name = c.name;
 
-        std::cout << "template<typename T>"                                     << "\n";
-        std::cout << "void for_each_member_of(const " << name << "& obj, T action)"   << "\n";
-        std::cout << "{"                                                        << "\n";
+        output << "template<typename T>"                                     << "\n";
+        output << "void for_each_member_of(const " << name << "& obj, T action)"   << "\n";
+        output << "{"                                                        << "\n";
 
         for (const auto& member: c.members)
         {
             const auto& member_name = member.name;
             const auto& member_type = member.type;
 
-            std::cout << "\taction(\"" << member_name << "\", obj." << member_name << ");\t// " << member_type << "\n";
+            output << "\taction(\"" << member_name << "\", obj." << member_name << ");\t// " << member_type << "\n";
         }
 
-        std::cout << "}"                                                        << "\n\n";
+        output << "}"                                                        << "\n\n";
     }
 
     return 0;
