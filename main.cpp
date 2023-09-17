@@ -65,7 +65,9 @@ namespace
             const CXType cxtype = clang_getCursorType(cursor);
             const std::string_view name = clang_getCString(cxname);
 
-            if (name.empty() == false)
+            const CX_CXXAccessSpecifier accessSpecifier = clang_getCXXAccessSpecifier(cursor);
+
+            if (name.empty() == false && accessSpecifier == CX_CXXPublic)
             {
                 const auto type = clang_getCString(clang_getTypeSpelling(cxtype));
 
