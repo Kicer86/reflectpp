@@ -132,8 +132,14 @@ namespace
             {
                 CXCursorKind definitionKind = clang_getCursorDefinition(cursor).kind;
 
-                if (definitionKind == CXCursor_ClassDecl || definitionKind == CXCursor_StructDecl)
+                const CXType cursorType = clang_getCursorType(cursor);
+                const int templateArgs = clang_Type_getNumTemplateArguments(cursorType);
+
+                if ( (definitionKind == CXCursor_ClassDecl || definitionKind == CXCursor_StructDecl)
+                    && templateArgs == -1)                                                                  // template specializations not supported yet
+                {
                     processClass(cursor, *data);
+                }
             }
             else if (cursorKind == CXCursor_Namespace)
                 processNamespace(cursor, *data);
