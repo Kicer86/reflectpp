@@ -14,7 +14,7 @@ namespace
 {
     struct ParseData
     {
-        ParseData(const std::string& path): source_path(path) {}
+        explicit ParseData(const std::string& path): source_path(path) {}
 
         std::string source_path;
         std::vector<std::string> scope;
@@ -27,7 +27,7 @@ namespace
 
         struct Class
         {
-            Class(const std::string& n): name(n) {}
+            explicit Class(const std::string& n): name(n) {}
 
             std::string name;
             std::vector<Member> members;
