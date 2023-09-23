@@ -51,21 +51,31 @@ namespace
         return scopedName;
     }
 
-    std::string generateMessage(CXCursor cursor, std::string_view message)
+    std::string generateLocation(const CXSourceLocation& location)
     {
-        const CXSourceLocation location = clang_getCursorLocation(cursor);
-
         CXFile file;
         unsigned line, column;
         clang_getFileLocation(location, &file, &line, &column, nullptr);
 
         const char* filePath = clang_getCString(clang_getFileName(file));
 
-        std::string fullMessage = filePath;
-        fullMessage += ":" + std::to_string(line) + ":" + std::to_string(column) + ": ";
-        fullMessage += message;
+        std::string locationMessage = filePath;
+        locationMessage += ":" + std::to_string(line) + ":" + std::to_string(column);
+
+        return locationMessage;
+    }
+
+    std::string generateMessage(const CXSourceLocation& location, std::string_view message)
+    {
+        const std::string fullMessage = generateLocation(location) + ": " + std::string(message);
 
         return fullMessage;
+    }
+
+    std::string generateMessage(CXCursor cursor, std::string_view message)
+    {
+        const CXSourceLocation location = clang_getCursorLocation(cursor);
+        return generateMessage(location, message);
     }
 
     CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data);
@@ -85,9 +95,7 @@ namespace
             const CX_CXXAccessSpecifier accessSpecifier = clang_getCXXAccessSpecifier(cursor);
 
             if (accessSpecifier != CX_CXXPublic)
-            {
                 std::cerr << generateMessage(cursor, "warning: " + std::string(name) + " is not a public member. Unable to generate reflexion data for it." + "\n");
-            }
 
             if (name.empty() == false && accessSpecifier == CX_CXXPublic)
             {
@@ -170,6 +178,77 @@ namespace
 
         return CXChildVisit_Continue;
     }
+
+    bool printProblems(const CXDiagnosticSet& diagnostics)
+    {
+        const auto count = clang_getNumDiagnosticsInSet(diagnostics);
+
+        bool has_errors = false;
+        for(unsigned i = 0; i < count; i++)
+        {
+            const auto diagnostic = clang_getDiagnosticInSet(diagnostics, i);
+            const auto severity = clang_getDiagnosticSeverity(diagnostic);
+            const CXString formattedMessage = clang_formatDiagnostic(diagnostic, clang_defaultDiagnosticDisplayOptions());
+            const bool error = severity == CXDiagnostic_Error || severity == CXDiagnostic_Fatal;
+            const auto diagnosticMessage = clang_getCString(formattedMessage);
+
+            std::cerr << diagnosticMessage << std::endl;
+
+            const auto childrenDiagnostics = clang_getChildDiagnostics(diagnostic);
+            has_errors |= printProblems(childrenDiagnostics);
+
+            clang_disposeDiagnostic(diagnostic);
+
+            has_errors |= error;
+        }
+
+        return has_errors;
+    }
+
+    void generateOutput(const ParseData& data, std::ostream& output)
+    {
+        for (const auto& c: data.classesList)
+        {
+            const auto& name = c.name;
+
+            output << "template<typename T>"                                            << "\n";
+            output << "void for_each_member_of(const " << name << "& obj, T action)"    << "\n";
+            output << "{"                                                               << "\n";
+
+            for (const auto& member: c.members)
+            {
+                const auto& member_name = member.name;
+                const auto& member_type = member.type;
+
+                output << "\taction(\"" << member_name << "\", obj." << member_name << ");\t// " << member_type << "\n";
+            }
+
+            output << "}"                                                               << "\n\n";
+
+            output << "template<typename T>"                                                                        << "\n";
+            output << "void set_object_member(" << name << "& obj, const std::string_view& member, const T& value)" << "\n";
+            output << "{"                                                                                           << "\n";
+
+            const auto s = c.members.size();
+            for (std::size_t i = 0; i < s; i++)
+            {
+                const auto& member = c.members[i];
+                const auto& member_name = member.name;
+                const auto& member_type = member.type;
+
+                output << "\tif constexpr (std::is_same_v<T, " << member_type << ">)"   << "\n";
+                output << "\t{"                                                         << "\n";
+                output << "\t\tif (member == \"" << member_name << "\")"                << "\n";
+                output << "\t\t\tobj." << member_name << " = value;"                    << "\n";
+                output << "\t}"                                                         << "\n";
+
+                if (i + 1 < s)
+                    output << "\telse ";
+            }
+            output << "}"                                                                                   << "\n";
+            output << "\n";
+        }
+    }
 }
 
 
@@ -194,6 +273,17 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    // errors
+    const auto diagnostics = clang_getDiagnosticSetFromTU(translationUnit);
+    const bool has_errors = printProblems(diagnostics);
+
+    if (has_errors)
+    {
+        // TODO: are errors fatal?
+        // return 1;
+    }
+
+    // generation
     const char* output_file = argv[1];
     std::ofstream output(output_file, std::ofstream::out | std::ofstream::trunc);
 
@@ -212,24 +302,7 @@ int main(int argc, char* argv[])
     clang_disposeTranslationUnit(translationUnit);
     clang_disposeIndex(index);
 
-    for (const auto& c: data.classesList)
-    {
-        const auto& name = c.name;
-
-        output << "template<typename T>"                                            << "\n";
-        output << "void for_each_member_of(const " << name << "& obj, T action)"    << "\n";
-        output << "{"                                                               << "\n";
-
-        for (const auto& member: c.members)
-        {
-            const auto& member_name = member.name;
-            const auto& member_type = member.type;
-
-            output << "\taction(\"" << member_name << "\", obj." << member_name << ");\t// " << member_type << "\n";
-        }
-
-        output << "}"                                                               << "\n\n";
-    }
+    generateOutput(data, output);
 
     return 0;
 }
