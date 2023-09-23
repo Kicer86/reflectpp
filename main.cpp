@@ -212,7 +212,7 @@ namespace
             const auto& name = c.name;
 
             output << "template<typename T>"                                            << "\n";
-            output << "void for_each_member_of(const " << name << "& obj, T action)"    << "\n";
+            output << "void get_each_member_of(const " << name << "& obj, T action)"    << "\n";
             output << "{"                                                               << "\n";
 
             for (const auto& member: c.members)
@@ -225,28 +225,40 @@ namespace
 
             output << "}"                                                               << "\n\n";
 
-            output << "template<typename T>"                                                                        << "\n";
-            output << "void set_object_member(" << name << "& obj, const std::string_view& member, const T& value)" << "\n";
-            output << "{"                                                                                           << "\n";
+            //
 
-            const auto s = c.members.size();
-            for (std::size_t i = 0; i < s; i++)
+            output << "template<typename T>"                                            << "\n";
+            output << "void set_each_member_of(" << name << "& obj, T action)"          << "\n";
+            output << "{"                                                               << "\n";
+
+            for (const auto& member: c.members)
             {
-                const auto& member = c.members[i];
                 const auto& member_name = member.name;
                 const auto& member_type = member.type;
 
-                output << "\tif constexpr (std::is_same_v<T, " << member_type << ">)"   << "\n";
-                output << "\t{"                                                         << "\n";
-                output << "\t\tif (member == \"" << member_name << "\")"                << "\n";
-                output << "\t\t\tobj." << member_name << " = value;"                    << "\n";
-                output << "\t}"                                                         << "\n";
+                output << "\tobj." << member_name << " = action(\"" << member_name << "\", obj." << member_name << ");\t// " << member_type << "\n";
+            }
 
+            output << "}"                                                               << "\n\n";
+
+            //
+
+            output << "template<typename R>"                                                                    << "\n";
+            output << "void set_object_member(" << name << "& obj, const std::string_view& member, R action)"   << "\n";
+            output << "{"                                                                                       << "\n";
+
+            for (const auto& member: c.members)
+            {
+                const auto& member_name = member.name;
+                const auto& member_type = member.type;
+
+                output << "\tif (member == \"" << member_name << "\")"                  << "\n";
+                output << "\t\taction(obj." << member_name << ");"                      << "\n";
                 output << "\telse ";
             }
 
-            if (s > 0)
-                output << "\n\t\tstatic_assert(false);\n";
+            if (c.members.empty() == false)
+                output << "{}\n";
 
             output << "}"                                                               << "\n";
             output << "\n";
@@ -295,7 +307,10 @@ int main(int argc, char* argv[])
     output << "#include " << source_file_absolute_path << "\n\n";
 
     output << "template<typename T, typename R>"         << "\n";
-    output << "void for_each_member_of(const T&, R);"    << "\n\n";
+    output << "void get_each_member_of(const T&, R);"    << "\n\n";
+
+    output << "template<typename T, typename R>"         << "\n";
+    output << "void set_each_member_of(T&, R);"          << "\n\n";
 
     ParseData data(source_file_absolute_path.string());
 
