@@ -242,10 +242,13 @@ namespace
                 output << "\t\t\tobj." << member_name << " = value;"                    << "\n";
                 output << "\t}"                                                         << "\n";
 
-                if (i + 1 < s)
-                    output << "\telse ";
+                output << "\telse ";
             }
-            output << "}"                                                                                   << "\n";
+
+            if (s > 0)
+                output << "\n\t\tstatic_assert(false);\n";
+
+            output << "}"                                                               << "\n";
             output << "\n";
         }
     }
