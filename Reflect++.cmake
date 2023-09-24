@@ -1,5 +1,5 @@
 
-function(ReflexFiles target output)
+function(ReflectFiles target output)
 
     foreach(source_file ${ARGN})
         get_filename_component(source_name ${source_file} NAME_WE)
@@ -10,10 +10,10 @@ function(ReflexFiles target output)
 
         add_custom_command(
             OUTPUT ${output_name}
-            COMMAND reflexpp ARGS ${CMAKE_CURRENT_BINARY_DIR}/${output_name} ${source_file} "$<LIST:TRANSFORM,$<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>,PREPEND,-I>" ${compiler_include_dirs} -std=c++${CMAKE_CXX_STANDARD}
+            COMMAND reflectpp ARGS ${CMAKE_CURRENT_BINARY_DIR}/${output_name} ${source_file} "$<LIST:TRANSFORM,$<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>,PREPEND,-I>" ${compiler_include_dirs} -std=c++${CMAKE_CXX_STANDARD}
             COMMAND_EXPAND_LISTS
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            DEPENDS ${source_file} reflexpp
+            DEPENDS ${source_file} reflectpp
         )
 
         list(APPEND ${output} ${CMAKE_CURRENT_BINARY_DIR}/${output_name})

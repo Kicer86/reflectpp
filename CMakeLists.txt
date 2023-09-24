@@ -10,9 +10,9 @@ if(TARGET libclang AND NOT CLANG_LIBRARIES)
     set(CLANG_LIBRARIES libclang)
 endif()
 
-add_executable(reflexpp
+add_executable(reflectpp
     main.cpp
 )
 
-target_include_directories(reflexpp PRIVATE ${CLANG_INCLUDE_DIRS})
-target_link_libraries(reflexpp PRIVATE ${CLANG_LIBRARIES})
+target_include_directories(reflectpp PRIVATE ${CLANG_INCLUDE_DIRS})
+target_link_libraries(reflectpp PRIVATE ${CLANG_LIBRARIES})
