@@ -205,22 +205,72 @@ namespace
         return has_errors;
     }
 
+    bool replace_first(std::string& str, const std::string_view& toReplace, const std::string_view& replaceWith)
+    {
+        const std::size_t pos = str.find(toReplace);
+        if (pos == std::string::npos)
+            return false;
+        else
+        {
+            str.replace(pos, toReplace.length(), replaceWith);
+            return true;
+        }
+    }
+
+    std::string mangleName(const std::string_view& name)
+    {
+        std::string retVal(name);
+        while(replace_first(retVal, "::", "_"));
+
+        return retVal;
+    }
+
     void generateOutput(const ParseData& data, std::ostream& output)
     {
+        output << "namespace reflectpp                                \n";
+        output << "{                                                \n\n";
+        output << "template<typename T, typename R>\n";
+        output << "void get_object_members(const T&, R);            \n\n";
+
+        output << "template<typename T, typename R>                   \n";
+        output << "void set_object_members(T&, R);                  \n\n";
+
         for (const auto& c: data.classesList)
         {
             const auto& name = c.name;
+            const auto mangled_name = mangleName(name);
 
-            output << "template<typename T>"                                            << "\n";
-            output << "void get_each_member_of(const " << name << "& obj, T action)"    << "\n";
-            output << "{"                                                               << "\n";
+            //
+            output << "namespace " << mangled_name << "_Meta                                \n";
+            output << "{                                                                  \n\n";
 
+            int i = 0;
             for (const auto& member: c.members)
             {
                 const auto& member_name = member.name;
                 const auto& member_type = member.type;
 
-                output << "\taction(\"" << member_name << "\", obj." << member_name << ");\t// " << member_type << "\n";
+                output << "struct Member" << i++ << "_Meta                                      \n";
+                output << "{                                                                    \n";
+                output << "\tconstexpr static std::string_view name = \"" << member_name << "\";\n";
+                output << "\tusing type = " << member_type << ";                                \n";
+                output << "};                                                                 \n\n";
+            }
+
+            output << "}                                                                  \n\n";
+
+            //
+
+            output << "template<typename T>"                                            << "\n";
+            output << "void get_object_members(const " << name << "& obj, T getter)"    << "\n";
+            output << "{"                                                               << "\n";
+
+            i = 0;
+            for (const auto& member: c.members)
+            {
+                const auto& member_name = member.name;
+
+                output << "\tgetter(" << mangled_name << "_Meta::Member" << i++ << "_Meta{}, obj." << member_name << ");\n";
             }
 
             output << "}"                                                               << "\n\n";
@@ -228,41 +278,21 @@ namespace
             //
 
             output << "template<typename T>"                                            << "\n";
-            output << "void set_each_member_of(" << name << "& obj, T action)"          << "\n";
+            output << "void set_object_members(" << name << "& obj, T setter)"          << "\n";
             output << "{"                                                               << "\n";
-
+            i = 0;
             for (const auto& member: c.members)
             {
                 const auto& member_name = member.name;
-                const auto& member_type = member.type;
 
-                output << "\tobj." << member_name << " = action(\"" << member_name << "\", obj." << member_name << ");\t// " << member_type << "\n";
+                output << "\tobj." << member_name << " = setter(" << mangled_name << "_Meta::Member" << i++ << "_Meta{});\n";
             }
 
             output << "}"                                                               << "\n\n";
 
-            //
-
-            output << "template<typename R>"                                                                    << "\n";
-            output << "void set_object_member(" << name << "& obj, const std::string_view& member, R action)"   << "\n";
-            output << "{"                                                                                       << "\n";
-
-            for (const auto& member: c.members)
-            {
-                const auto& member_name = member.name;
-                const auto& member_type = member.type;
-
-                output << "\tif (member == \"" << member_name << "\")"                  << "\n";
-                output << "\t\taction(obj." << member_name << ");"                      << "\n";
-                output << "\telse ";
-            }
-
-            if (c.members.empty() == false)
-                output << "{}\n";
-
-            output << "}"                                                               << "\n";
-            output << "\n";
         }
+
+        output << "}\n";
     }
 }
 
@@ -303,14 +333,8 @@ int main(int argc, char* argv[])
     std::ofstream output(output_file, std::ofstream::out | std::ofstream::trunc);
 
     output << "\n";
-    output << "#pragma once\n";
-    output << "#include " << source_file_absolute_path << "\n\n";
-
-    output << "template<typename T, typename R>"         << "\n";
-    output << "void get_each_member_of(const T&, R);"    << "\n\n";
-
-    output << "template<typename T, typename R>"         << "\n";
-    output << "void set_each_member_of(T&, R);"          << "\n\n";
+    output << "#pragma once                                   \n";
+    output << "#include " << source_file_absolute_path  << "\n\n";
 
     ParseData data(source_file_absolute_path.string());
 
