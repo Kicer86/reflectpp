@@ -1,11 +1,7 @@
 
-#include <algorithm>
-#include <cassert>
-#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <set>
 #include <vector>
 #include <clang-c/Index.h>
 
