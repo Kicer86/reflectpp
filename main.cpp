@@ -330,7 +330,13 @@ int main(int argc, char* argv[])
 
     output << "\n";
     output << "#pragma once                                   \n";
-    output << "#include " << source_file_absolute_path  << "\n\n";
+    output << "#include <string_view>                         \n";
+
+    // do not include source file if it is a c/cpp file
+    if (source_file_absolute_path.extension().generic_string().starts_with(".c") == false)
+        output << "#include " << source_file_absolute_path  << "\n";
+
+    output << "\n";
 
     ParseData data(source_file_absolute_path.string());
 
