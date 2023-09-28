@@ -11,9 +11,11 @@ if(GTest_FOUND)
     )
 
     ReflectFiles(
-        reflectpp_test
         ReflectedFiles
-        struct_a.hpp
+        TARGET
+            reflectpp_test
+        SOURCES
+            struct_a.hpp
     )
 
     target_sources(reflectpp_test
