@@ -16,5 +16,6 @@ add_executable(reflectpp
     main.cpp
 )
 
+set_property(TARGET reflectpp PROPERTY CXX_STANDARD 20)
 target_include_directories(reflectpp PRIVATE ${CLANG_INCLUDE_DIRS})
 target_link_libraries(reflectpp PRIVATE ${CLANG_LIBRARIES})
