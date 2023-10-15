@@ -4,6 +4,7 @@ project(reflexpp LANGUAGES C CXX)
 
 find_package(Clang REQUIRED 16)
 
+enable_testing()
 add_subdirectory(tests)
 
 # if Config mode was used (linux and macos) libclang target will be available
