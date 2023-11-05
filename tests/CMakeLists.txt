@@ -8,6 +8,7 @@ if(GTest_FOUND)
     add_executable(reflectpp_test
         test_members_getting.cpp
         test_members_setting.cpp
+        test_nested_types.cpp
     )
 
     ReflectFiles(
@@ -16,6 +17,7 @@ if(GTest_FOUND)
             reflectpp_test
         SOURCES
             struct_a.hpp
+            struct_b.hpp
     )
 
     target_sources(reflectpp_test

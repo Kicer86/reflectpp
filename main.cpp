@@ -47,6 +47,35 @@ namespace
         return scopedName;
     }
 
+    std::string generateScopedName(CXCursor cursor)
+    {
+        CXCursor scopeCursor = clang_getCursorSemanticParent(cursor);
+
+        std::vector<std::string> scope;
+
+        while (clang_Cursor_isNull(scopeCursor) == false && clang_getCursorKind(scopeCursor) != CXCursor_TranslationUnit)
+        {
+            const CXString scopeName = clang_getCursorSpelling(scopeCursor);
+
+            if (clang_getCString(scopeName) && clang_getCString(scopeName)[0] != '\0')
+            {
+                // Print the scope name, which can be a namespace or class name
+                scope.push_back(clang_getCString(scopeName));
+            }
+
+            clang_disposeString(scopeName);
+
+            // Move up to the next parent in the hierarchy
+            scopeCursor = clang_getCursorSemanticParent(scopeCursor);
+        }
+
+        const CXString symbolName = clang_getCursorSpelling(cursor);
+        const std::string symbol = clang_getCString(symbolName);
+        clang_disposeString(symbolName);
+
+        return generateScopedName(scope, symbol);
+    }
+
     std::string generateLocation(const CXSourceLocation& location)
     {
         CXFile file;
@@ -74,6 +103,25 @@ namespace
         return generateMessage(location, message);
     }
 
+    std::string_view templateParameters(std::string_view type)
+    {
+        const auto pos = type.find_first_of("<");
+        const std::string_view tpl_params = pos == std::string::npos? std::string_view() : type.substr(pos);
+
+        return tpl_params;
+    }
+
+    std::string getType(CXCursor cursor)
+    {
+        const CXType cxtype = clang_getCursorType(cursor);
+        const auto type = clang_getCString(clang_getTypeSpelling(cxtype));
+        const auto declarationCursor = clang_getTypeDeclaration(cxtype);
+        const auto cursorKind = clang_getCursorKind(declarationCursor);
+        const auto scopedType = cursorKind == CXCursor_NoDeclFound? type : (generateScopedName(declarationCursor) + std::string(templateParameters(type)));
+
+        return scopedType;
+    }
+
     CXChildVisitResult visitor(CXCursor cursor, CXCursor, CXClientData client_data);
 
     CXChildVisitResult membersVisitor(CXCursor cursor, CXCursor, CXClientData client_data)
@@ -85,7 +133,6 @@ namespace
             std::vector<ParseData::Member>* members = static_cast<std::vector<ParseData::Member>*>(client_data);
 
             const CXString cxname = clang_getCursorSpelling(cursor);
-            const CXType cxtype = clang_getCursorType(cursor);
             const std::string_view name = clang_getCString(cxname);
 
             const CX_CXXAccessSpecifier accessSpecifier = clang_getCXXAccessSpecifier(cursor);
@@ -95,7 +142,7 @@ namespace
 
             if (name.empty() == false && accessSpecifier == CX_CXXPublic)
             {
-                const auto type = clang_getCString(clang_getTypeSpelling(cxtype));
+                const auto type = getType(cursor);
 
                 members->push_back({.name = std::string(name), .type = type});
             }
